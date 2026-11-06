@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HeatGuard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=Noto+Naskh+Arabic:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --chalk:#F2F4F1; --paper:#FFFFFF; --ink:#16302B; --ink-2:#4A5F5A; --line:#D6DDD8;
+  --shade:#E3EBE6;
+  --l0:#4F8A5B; --l1:#D9A520; --l2:#E06A2C; --l3:#B42318;
+  --wa:#DCF8C6; --wa-in:#FFFFFF; --wa-bg:#ECE5DD;
+  --focus:#1D6FD1;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--chalk);color:var(--ink);font:15px/1.45 "Archivo",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+[dir=rtl],.rtl{font-family:"Noto Naskh Arabic","Archivo",sans-serif}
+.deva{font-family:"Noto Sans Devanagari","Archivo",sans-serif}
+
+/* top bar */
+header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff}
+.bar{max-width:1320px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-stretch:112%;font-size:20px;letter-spacing:.01em}
+.brand svg{flex:none}
+.company{opacity:.8;font-size:14px}
+nav{display:flex;gap:4px;margin-left:auto}
+nav button{background:none;border:0;padding:8px 12px;border-radius:6px;color:#fff;opacity:.75}
+nav button[aria-current=page]{opacity:1;background:rgba(255,255,255,.14)}
+.status-line{max-width:1320px;margin:0 auto;padding:0 20px 10px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:#C9D6D2}
+.status-line b{color:#fff;font-weight:600}
+
+main{max-width:1320px;margin:0 auto;padding:20px}
+.view{display:none}.view.on{display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
+@media (max-width:1000px){.grid{grid-template-columns:1fr}}
+
+/* sites */
+.site{background:var(--paper);border:1px solid var(--line);border-radius:10px;margin-bottom:20px;overflow:hidden}
+.site-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.site-head h2{margin:0;font-size:19px;font-stretch:110%;font-weight:750}
+.site-head .where{color:var(--ink-2);font-size:14px}
+.source{font-size:13px;color:var(--ink-2)}
+.source.warn{color:var(--l3);font-weight:600}
+.crew{display:grid;grid-template-columns:minmax(150px,1.2fr) 150px minmax(220px,1.6fr) 150px;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);align-items:center}
+.crew:last-child{border-bottom:0}
+@media (max-width:760px){.crew{grid-template-columns:1fr 1fr}.strip .h:nth-child(even) span{display:none}.strip-wrap{grid-column:1/-1}}
+.crew h3{margin:0;font-size:16px;font-weight:700}
+.crew .task{color:var(--ink-2);font-size:13px}
+.factors{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.factors select{font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:var(--chalk)}
+.off-shift{color:var(--ink-2);font-size:12px;margin-top:4px}
+
+/* the heat flag */
+.flag{display:flex;align-items:center;gap:10px}
+.flag svg{flex:none}
+.flag .lv{font-weight:800;font-stretch:108%;font-size:17px;line-height:1.1}
+.flag .fl{font-size:13px;color:var(--ink-2)}
+.lv0{color:var(--l0)}.lv1{color:#9A7210}.lv2{color:var(--l2)}.lv3{color:var(--l3)}
+
+/* six-hour strip: the signature element */
+.strip{display:grid;grid-template-columns:repeat(6,1fr);gap:3px}
+.strip .h{height:34px;border-radius:3px;position:relative}
+.strip .h span{position:absolute;bottom:-17px;left:0;font-size:11px;color:var(--ink-2)}
+.strip-wrap{padding-bottom:14px}
+.strip-note{font-size:12px;color:var(--ink-2);margin-top:2px}
+.strip-note b{color:var(--ink)}
+.bg0{background:var(--l0)}.bg1{background:var(--l1)}.bg2{background:var(--l2)}.bg3{background:var(--l3)}
+.bgx{background:repeating-linear-gradient(45deg,var(--shade) 0 6px,#fff 6px 12px)}
+
+.checks{font-size:13px;line-height:1.6}
+.checks .bad{color:var(--l3);font-weight:700}
+details.why{grid-column:1/-1;font-size:13px;color:var(--ink-2);margin-top:-6px}
+details.why summary{cursor:pointer;width:max-content}
+details.why ul{margin:6px 0 0;padding-left:18px}
+
+/* side column */
+aside{position:sticky;top:110px;display:flex;flex-direction:column;gap:20px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.panel h2{margin:0 0 10px;font-size:17px;font-weight:750;font-stretch:108%}
+.esc{border-left:4px solid var(--l3);padding:8px 10px;margin-bottom:10px;background:#FDF3F2;border-radius:0 6px 6px 0}
+.esc.done{border-color:var(--line);background:var(--chalk);color:var(--ink-2)}
+.esc p{margin:0 0 6px}
+.empty{color:var(--ink-2);font-size:14px;margin:0}
+.btn{border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:6px;padding:7px 12px;font-weight:600;font-size:14px}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn.hot{background:var(--l3);border-color:var(--l3)}
+.sim label{display:block;font-size:13px;color:var(--ink-2);margin:10px 0 4px}
+.sim select{width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.hint{font-size:13px;color:var(--ink-2);margin:8px 0 0}
+
+/* phones */
+.phones{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px}
+@media (max-width:760px){.phones{grid-template-columns:1fr}}
+.people{background:var(--paper);border:1px solid var(--line);border-radius:10px;max-height:72vh;overflow:auto}
+.people button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:10px 14px}
+.people button[aria-current=true]{background:var(--shade)}
+.people small{display:block;color:var(--ink-2)}
+.people .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--l3);margin-left:6px}
+.phone{background:var(--wa-bg);border-radius:14px;border:1px solid var(--line);display:flex;flex-direction:column;height:72vh}
+.phone-head{background:#075E54;color:#fff;padding:12px 16px;border-radius:14px 14px 0 0}
+.phone-head small{opacity:.8;display:block}
+.thread{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:78%;padding:8px 10px;border-radius:8px;box-shadow:0 1px 0 rgba(0,0,0,.08);font-size:14px}
+.msg.out{background:var(--wa-in);align-self:flex-start}
+.msg.in{background:var(--wa);align-self:flex-end}
+.msg .body{white-space:pre-wrap}
+.msg time{display:block;font-size:11px;color:var(--ink-2);margin-top:4px;text-align:end}
+.wa-btns{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.wa-btns button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px;color:#0B7A6E;font-weight:600}
+.composer{display:flex;gap:8px;padding:10px;background:#F0F0F0;border-radius:0 0 14px 14px}
+.composer input{flex:1;border:1px solid var(--line);border-radius:18px;padding:8px 12px}
+
+/* metrics */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:24px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat .n{font-size:30px;font-weight:800;font-stretch:110%;line-height:1.1}
+.stat .d{font-size:14px;color:var(--ink-2)}
+table{border-collapse:collapse;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);font-size:14px}
+th{background:var(--shade);font-weight:650}
+.prose{max-width:70ch}
+.prose h2{font-size:22px;font-stretch:108%;margin:24px 0 8px}
+.prose li{margin-bottom:6px}
+
+/* guest gate */
+#gate{position:fixed;inset:0;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;z-index:20;padding:20px}
+#gate .card{max-width:560px}
+#gate h1{font-size:44px;font-stretch:118%;font-weight:800;line-height:1.05;margin:16px 0 14px}
+#gate p{font-size:17px;color:#C9D6D2;margin:0 0 22px}
+#gate .btn{background:#fff;color:var(--ink);border-color:#fff;padding:12px 20px;font-size:16px}
+#gate .flags{display:flex;gap:6px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;z-index:30}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div id="gate" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+  <div class="card">
+    <div class="flags" aria-hidden="true"></div>
+    <h1 id="gate-title">Warn crews before the heat does.</h1>
+    <p>HeatGuard reads live weather for each work site, adjusts for the job and the clothing, and sends crews and supervisors WhatsApp alerts in their own language. This demo company has sites in Abu Dhabi and Karachi with fictional crews.</p>
+    <button class="btn" id="enter">Continue as guest</button>
+  </div>
+</div>
+
+<header>
+  <div class="bar">
+    <div class="brand"><svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true"><rect x="1" y="0" width="2.5" height="26" fill="#fff"/><path d="M3.5 2h17l-4 6 4 6h-17z" fill="#E06A2C"/></svg>HeatGuard</div>
+    <span class="company" id="company"></span>
+    <nav aria-label="Views">
+      <button data-view="live" aria-current="page">Sites</button>
+      <button data-view="phones">Phones</button>
+      <button data-view="metrics">Results</button>
+      <button data-view="privacy">Worker protection</button>
+    </nav>
+  </div>
+  <div class="status-line" id="status"></div>
+</header>
+
+<main>
+  <section class="view on" id="live">
+    <div class="grid">
+      <div id="sites"></div>
+      <aside>
+        <div class="panel" aria-live="polite">
+          <h2>Needs action now</h2>
+          <div id="escs"></div>
+        </div>
+        <div class="panel sim">
+          <h2>Try it</h2>
+          <p class="hint" style="margin-top:0">November weather is mild, so use these controls to see what happens on a dangerous day.</p>
+          <label for="sim-site">Site</label>
+          <select id="sim-site"></select>
+          <div class="row">
+            <button class="btn hot" data-preset="heatwave">Heatwave 46°C</button>
+            <button class="btn ghost" data-preset="humid">Humid 37°C</button>
+            <button class="btn ghost" id="sim-clear">Back to live weather</button>
+          </div>
+          <label>Time and failures</label>
+          <div class="row">
+            <button class="btn ghost" id="advance">Skip ahead 20 minutes</button>
+            <button class="btn ghost" id="feed">Cut the weather feed</button>
+          </div>
+          <div class="row">
+            <button class="btn ghost" id="run">Check all sites now</button>
+            <button class="btn ghost" id="reset">Reset demo</button>
+          </div>
+          <p class="hint">Then open Phones to answer as a worker, or see the supervisor's messages.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="view" id="phones">
+    <div class="phones">
+      <div class="people" id="people" role="list"></div>
+      <div class="phone" id="phone"></div>
+    </div>
+  </section>
+
+  <section class="view" id="metrics">
+    <div class="stats" id="stats"></div>
+    <h2 style="font-size:19px;margin:0 0 10px">Equal warning across languages</h2>
+    <p class="hint" style="margin:0 0 12px">Every language group should get the same check-ins and answer as quickly. A gap here means a message isn't landing.</p>
+    <div id="fair"></div>
+  </section>
+
+  <section class="view" id="privacy">
+    <div class="prose">
+      <h2 style="margin-top:0">How HeatGuard protects workers</h2>
+      <ul>
+        <li><b>Workers choose to join.</b> Nobody gets alerts until they reply YES to a plain message in their language. Replying STOP removes them at any time.</li>
+        <li><b>Only what's needed.</b> Phone number, crew, language and replies. No location tracking and no health history.</li>
+        <li><b>Supervisors see crews, not medical detail.</b> A worker's first name appears only while a live escalation is open, so someone can reach them. After it's handled, the record shows "worker".</li>
+        <li><b>Never used against workers.</b> HeatGuard data can't be used for discipline, pay, hiring, insurance or performance reviews.</li>
+        <li><b>Replies are deleted after 30 days.</b> Only counts remain for results reporting.</li>
+        <li><b>Not a medical device.</b> HeatGuard warns and guides. Anyone who feels unwell is routed to a person: the supervisor, the first-aider, or emergency services.</li>
+        <li><b>When unsure, it raises the alarm.</b> Missing weather data or no reply makes HeatGuard more cautious, never less.</li>
+      </ul>
+      <h2>How risk is worked out</h2>
+      <ol>
+        <li>Heat index from air temperature and humidity, using the US National Weather Service formula.</li>
+        <li>Up to 8°C more for working in direct sun, scaled by measured sunlight (OSHA guidance).</li>
+        <li>Bands from OSHA heat-index guidance: Low, Caution, High, Extreme.</li>
+        <li>One level higher for heavy work or non-breathable clothing, and one more for workers with under 7 days in the heat. Only applied once it's warm, so cool mornings don't raise false alarms.</li>
+        <li>In the UAE, outdoor work is stopped 12:30–15:00 from 15 June to 15 September, as the law requires.</li>
+      </ol>
+      <h2>Message workers receive to join</h2>
+      <p id="consent-text"></p>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const LV=["Low","Caution","High","Extreme"];
+const $=s=>document.querySelector(s);
+let S=null, P=null, currentPerson=null;
+
+function flagSvg(l,size=22,pole="var(--ink)"){
+  const c=["var(--l0)","var(--l1)","var(--l2)","var(--l3)"][l] || "var(--line)";
+  return `<svg width="${size}" height="${size*1.15}" viewBox="0 0 20 23" aria-hidden="true"><rect x="0" y="0" width="2" height="23" fill="${pole}"/><path d="M2 1h16l-3.5 5.5L18 12H2z" fill="${c}"/></svg>`;
+}
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const hhmm=iso=>iso?iso.slice(11,16):"";
+function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2600)}
+async function api(path,opts={}){
+  const r=await fetch(path,{headers:{"Content-Type":"application/json"},...opts,body:opts.body?JSON.stringify(opts.body):undefined});
+  if(!r.ok){const t=await r.text();toast("Couldn't do that: "+t.slice(0,80));throw new Error(t)}
+  return r.json();
+}
+
+/* ---------- Sites ---------- */
+const SRC={live:"Live weather",cache:"Weather feed down: using last forecast",fallback:"No weather data: cautious default schedule",sim:"Simulated conditions"};
+function renderSites(){
+  $("#company").textContent=S.company;
+  const offs=S.clock_offset_min?` (demo clock +${S.clock_offset_min} min)`:"";
+  $("#status").innerHTML=`<span>Checked every 15 minutes${offs}</span>`+(S.feed_down?`<span><b>Weather feed cut in demo</b></span>`:"");
+  $("#sites").innerHTML=S.sites.map(s=>{
+    const warn=s.weather_status!=="live"&&s.weather_status!=="sim";
+    const src=SRC[s.weather_status]||s.weather_status;
+    const age=s.weather_age_min!=null&&s.weather_status!=="sim"?`, updated ${s.weather_age_min} min ago`:"";
+    return `<article class="site" aria-labelledby="s${s.id}">
+      <div class="site-head"><div><h2 id="s${s.id}">${esc(s.name)}</h2><span class="where">${esc(s.city)}, ${s.local_time} local</span></div>
+      <span class="source ${warn?"warn":""}">${esc(src)}${age}${s.sim?`: ${esc(s.sim.label)}`:""}</span></div>
+      ${s.crews.map(c=>crewRow(c)).join("")}
+    </article>`}).join("");
+  document.querySelectorAll(".factors select").forEach(sel=>sel.onchange=async()=>{
+    const body={};body[sel.dataset.k]=sel.dataset.k==="acclimatised_days"?Number(sel.value):sel.dataset.k==="shaded"?sel.value==="1":sel.value;
+    await api(`/api/crews/${sel.dataset.id}`,{method:"PATCH",body});toast("Crew updated and rechecked");load();
+  });
+  const opts=S.sites.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");
+  const sel=$("#sim-site"),v=sel.value;sel.innerHTML=opts;if(v)sel.value=v;
+}
+function crewRow(c){
+  const o=c.outlook; if(!o) return "";
+  const cur=o.current, l=cur.level;
+  const fl=Number.isFinite(cur.feels_like_c)?`Feels like ${Math.round(cur.feels_like_c)}°C`:"No live reading";
+  const hrs=(o.hours||[]).slice(0,6);
+  const cells=hrs.length?hrs.map(h=>`<div class="h bg${h.level}" title="${hhmm(h.t)}: ${LV[h.level]}"><span>${hhmm(h.t)}</span></div>`).join("")
+    :Array.from({length:6},()=>`<div class="h bgx" title="No forecast"></div>`).join("");
+  let note="";
+  const fh=o.first_high_at&&hrs.find(h=>h.t===o.first_high_at);
+  if(fh&&o.lead_minutes!=null) note=`Reaches <b>${LV[fh.level]}</b> at ${hhmm(o.first_high_at)}, in ${o.lead_minutes} min`;
+  else if(o.peak_at&&o.peak_level>l) note=`Peaks at <b>${LV[o.peak_level]}</b> around ${hhmm(o.peak_at)}`;
+  else if(!hrs.length) note="Forecast unavailable";
+  else note=`Next 6 hours`;
+  const ck=c.checkins;
+  const checks=[
+    ck.ok?`${ck.ok} OK`:"", ck.waiting?`${ck.waiting} waiting for reply`:"",
+    ck.unwell?`<span class="bad">${ck.unwell} unwell</span>`:"", ck.no_reply?`<span class="bad">${ck.no_reply} not answering</span>`:""
+  ].filter(Boolean).join("<br>")||`<span style="color:var(--ink-2)">No check-ins yet</span>`;
+  const sel=(k,val,opts)=>`<select data-id="${c.id}" data-k="${k}" aria-label="${k.replace('_',' ')} for ${esc(c.name)}">${opts.map(([v,t])=>`<option value="${v}" ${String(v)===String(val)?"selected":""}>${t}</option>`).join("")}</select>`;
+  return `<div class="crew">
+    <div><h3>${esc(c.name)}</h3><div class="task">${esc(c.task)}, ${c.consented} of ${c.workers} workers signed up</div>
+      <div class="factors">
+        ${sel("workload",c.workload,[["light","Light work"],["moderate","Moderate work"],["heavy","Heavy work"]])}
+        ${sel("clothing",c.clothing,[["standard","Normal clothing"],["non_breathable","Coveralls / PPE"]])}
+        ${sel("acclimatised_days",c.acclimatised_days,[[2,"New: 2 days"],[5,"5 days in heat"],[14,"2 weeks in heat"],[30,"1 month in heat"],[60,"2 months in heat"]].concat([[c.acclimatised_days,c.acclimatised_days+" days in heat"]]).filter((x,i,a)=>a.findIndex(y=>String(y[0])===String(x[0]))===i))}
+        ${sel("shaded",c.shaded?1:0,[[0,"In the sun"],[1,"In shade"]])}
+      </div>
+      ${c.in_shift?"":`<div class="off-shift">Off shift (${c.shift}): no alerts sent</div>`}
+    </div>
+    <div class="flag">${flagSvg(l)}<div><div class="lv lv${l}">${LV[l]}</div><div class="fl">${fl}</div></div></div>
+    <div class="strip-wrap"><div class="strip" aria-label="Heat risk for the next 6 hours">${cells}</div><div class="strip-note" style="margin-top:18px">${note}</div></div>
+    <div class="checks">${checks}</div>
+    <details class="why"><summary>Why ${LV[l]}?</summary><ul>${cur.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></details>
+  </div>`;
+}
+function renderEscs(){
+  const open=S.escalations.filter(e=>!e.acknowledged), done=S.escalations.filter(e=>e.acknowledged).slice(0,4);
+  const item=e=>`<div class="esc ${e.acknowledged?"done":""}">
+      <p><b>${e.reason==="unwell"?`${esc(e.person)} feels unwell`:`${esc(e.person)} isn't answering`}</b><br>${esc(e.crew)}, ${esc(e.site)}: ${e.level_name} heat, ${e.minutes_ago} min ago</p>
+      ${e.acknowledged?`<small>Handled by ${esc(e.acknowledged_by)} after ${e.ack_minutes} min</small>`:`<button class="btn small" data-ack="${e.id}">Mark as handled</button>`}
+    </div>`;
+  $("#escs").innerHTML=(open.length?open.map(item).join(""):`<p class="empty">Nobody needs help right now.</p>`)+(done.length?`<p class="hint">Recently handled</p>`+done.map(item).join(""):"");
+  document.querySelectorAll("[data-ack]").forEach(b=>b.onclick=async()=>{await api(`/api/escalations/${b.dataset.ack}/ack`,{method:"POST"});toast("Marked as handled");load()});
+}
+
+/* ---------- Phones ---------- */
+const ROLE={worker:"Worker",supervisor:"Supervisor",first_aider:"First-aider"};
+const LANG={en:"English",ur:"Urdu",ar:"Arabic",hi:"Hindi"};
+function renderPeople(){
+  if(!currentPerson) currentPerson=(P.people.find(p=>p.role==="worker")||P.people[0]).id;
+  $("#people").innerHTML=P.people.map(p=>`<button role="listitem" data-p="${p.id}" aria-current="${p.id===currentPerson}">
+    ${esc(p.name)}${p.open_checkin?'<span class="dot" title="Waiting for reply"></span>':""}
+    <small>${ROLE[p.role]}, ${LANG[p.language]}${p.crew?`, ${esc(p.crew)}`:`, ${esc(p.site)}`}${p.consent!=="yes"?` (${p.consent==="pending"?"not signed up yet":"opted out"})`:""}</small></button>`).join("");
+  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{currentPerson=Number(b.dataset.p);renderPeople();renderPhone()});
+}
+function renderPhone(){
+  const p=P.people.find(x=>x.id===currentPerson); if(!p) return;
+  const cls=p.language==="ar"||p.language==="ur"?"rtl":p.language==="hi"?"deva":"";
+  const last=[...p.messages].reverse().find(m=>m.dir==="out"&&m.buttons);
+  const thread=p.messages.map(m=>`<div class="msg ${m.dir} ${cls}"><div class="body" dir="auto">${esc(m.body)}</div>${m.buttons&&m===last&&p.open_checkin?`<div class="wa-btns">${m.buttons.map(b=>`<button data-reply="${esc(b.title)}">${esc(b.title)}</button>`).join("")}</div>`:""}<time dir="ltr">${hhmm(m.at)}${m.dir==="out"&&m.delivery==="outbox"?", demo number: not sent":m.delivery==="sent"?", sent on WhatsApp":""}</time></div>`).join("")
+    ||`<p class="empty" style="text-align:center;margin-top:30%">No messages yet. Start a heatwave on the Sites view.</p>`;
+  $("#phone").innerHTML=`<div class="phone-head"><b>${esc(p.name)}</b><small>${ROLE[p.role]}, ${LANG[p.language]}, ${esc(p.phone)} (fictional), times are local</small></div>
+    <div class="thread" id="thread">${thread}</div>
+    <form class="composer" id="composer"><input id="reply" aria-label="Reply as ${esc(p.name)}" placeholder="Reply as ${esc(p.name)}: try YES, STOP${p.role!=="worker"?", ACK":", OK"}"><button class="btn small">Send</button></form>`;
+  const t=$("#thread");t.scrollTop=t.scrollHeight;
+  document.querySelectorAll("[data-reply]").forEach(b=>b.onclick=()=>reply(p.id,b.dataset.reply));
+  $("#composer").onsubmit=e=>{e.preventDefault();const v=$("#reply").value.trim();if(v)reply(p.id,v)};
+}
+async function reply(pid,text){
+  const r=await api("/api/sim/reply",{method:"POST",body:{person_id:pid,text}});
+  const map={escalated:"Supervisor and first-aider alerted",ok:"Reply recorded",consented:"Signed up",opted_out:"Opted out",acknowledged:"Escalation handled",noted:"Message received"};
+  toast(map[r.action]||"Sent");await load();
+}
+
+/* ---------- Results ---------- */
+async function renderMetrics(){
+  const m=await api("/api/metrics");
+  const v=(x,s="")=>x==null?"—":(s===" min"?(x<1?"under 1 min":Math.round(x)+" min"):x+s);
+  const ds=m.data_sources,tot=Object.values(ds).reduce((a,b)=>a+b,0)||1;
+  const stats=[
+    [m.alerts_sent,"alerts sent to workers"],
+    [v(m.median_lead_min," min"),"median warning before risk reaches High"],
+    [v(m.false_alarm_rate,"%"),`false alarms (of ${m.warnings_checked} warnings checked)`],
+    [v(m.response_rate,"%"),"of check-ins answered"],
+    [v(m.median_reply_min," min"),"median time to answer"],
+    [m.unwell_reports,"workers reported feeling unwell"],
+    [m.no_reply_escalations,"escalated for not answering"],
+    [v(m.median_ack_min," min"),"median time for a supervisor to respond"],
+    [Math.round(100*(ds.live+ds.sim)/tot)+"%","of checks ran on live or simulated data; the rest used the safe fallback"],
+  ];
+  $("#stats").innerHTML=stats.map(([n,d])=>`<div class="stat"><div class="n">${n}</div><div class="d">${d}</div></div>`).join("");
+  $("#fair").innerHTML=m.fairness.length?`<table><thead><tr><th>Language</th><th>Check-ins</th><th>Answered</th><th>Median time to answer</th></tr></thead><tbody>${m.fairness.map(f=>`<tr><td>${esc(f.language)}</td><td>${f.checkins}</td><td>${f.response_rate}%</td><td>${v(f.median_reply_min," min")}</td></tr>`).join("")}</tbody></table>`
+    :`<p class="empty">No check-ins yet. Start a heatwave on the Sites view, then answer as a few workers.</p>`;
+}
+
+/* ---------- wiring ---------- */
+async function load(){
+  [S,P]=await Promise.all([api("/api/state"),api("/api/phones")]);
+  renderSites();renderEscs();renderPeople();renderPhone();
+  if($("#metrics").classList.contains("on")) renderMetrics();
+}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.removeAttribute("aria-current"));
+  b.setAttribute("aria-current","page");
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id===b.dataset.view));
+  if(b.dataset.view==="metrics") renderMetrics();
+});
+document.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{
+  await api("/api/sim/heat",{method:"POST",body:{site_id:Number($("#sim-site").value),preset:b.dataset.preset}});toast("Conditions set; alerts sent where needed");load()});
+$("#sim-clear").onclick=async()=>{await api(`/api/sim/heat/${$("#sim-site").value}`,{method:"DELETE"});toast("Back to live weather");load()};
+$("#advance").onclick=async()=>{await api("/api/sim/advance",{method:"POST",body:{minutes:20}});toast("20 minutes later");load()};
+$("#feed").onclick=async()=>{const down=!S.feed_down;await api("/api/sim/feed",{method:"POST",body:{down}});$("#feed").textContent=down?"Restore the weather feed":"Cut the weather feed";toast(down?"Weather feed cut":"Weather feed restored");load()};
+$("#run").onclick=async()=>{await api("/api/cycle",{method:"POST"});toast("All sites checked");load()};
+$("#reset").onclick=async()=>{if(!confirm("Reset the demo to its starting state?"))return;await api("/api/demo/reset",{method:"POST"});currentPerson=null;toast("Demo reset");load()};
+$("#enter").onclick=()=>{try{sessionStorage.setItem("hg-guest","1")}catch(e){};$("#gate").remove();load()};
+$("#gate .flags").innerHTML=[0,1,2,3].map(l=>flagSvg(l,26,"#fff")).join("");
+$("#consent-text").textContent="HeatGuard heat-safety alerts for Demo Contracting LLC. We send heat warnings and ask if you're OK during hot hours. We keep only your phone number, crew and replies, and delete replies after 30 days. Your replies are never used for discipline, pay or hiring. Reply YES to join, or STOP to leave at any time.";
+let guest=false;try{guest=sessionStorage.getItem("hg-guest")==="1"}catch(e){}
+if(guest){$("#gate").remove();load()}
+setInterval(()=>{if(!document.getElementById("gate")) load()},15000);
+</script>
+</body>
+</html>
