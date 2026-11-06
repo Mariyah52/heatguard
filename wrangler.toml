@@ -1,0 +1,5 @@
+# Cloudflare Worker that serves HeatGuard (hosted on Render) at heatguard.imadi.tech
+name = "heatguard"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
