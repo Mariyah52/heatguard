@@ -15,7 +15,10 @@ if DATABASE_URL.startswith("postgresql://"):
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True,
                        connect_args={"check_same_thread": False}
-                       if DATABASE_URL.startswith("sqlite") else {})
+                       if DATABASE_URL.startswith("sqlite")
+                       # a hard connect timeout: a stuck TLS/pooler handshake must fail fast,
+                       # not hang the app's startup forever
+                       else {"connect_timeout": 10})
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
