@@ -36,6 +36,13 @@ WORKERS = [
     [("Nadeem", "ur", "yes"), ("Faisal", "ur", "yes"), ("Hamza", "ur", "yes")],
     [("Asif", "ur", "yes"), ("Zubair", "ur", "yes")],
 ]
+
+# For the live demo/judging: one worker's phone is swapped for a real, verified
+# WhatsApp test-recipient number, so alerts actually arrive on a real phone.
+# (first_name) -> (real phone, language override)
+REAL_RECIPIENT_OVERRIDE = {
+    "Nadeem": ("+923153205484", "en"),
+}
 STAFF = [
     [("Hassan", "supervisor", "en"), ("Priya", "first_aider", "en")],
     [("Omar", "supervisor", "ar"), ("Grace", "first_aider", "en")],
@@ -68,10 +75,13 @@ def seed_demo(db):
             db.flush()
             for fname, lang, consent in WORKERS[crew_i]:
                 n += 1
+                phone = f"+97150000{n:04d}" if s["country"] == "AE" else f"+92300000{n:04d}"
+                if fname in REAL_RECIPIENT_OVERRIDE:
+                    phone, lang = REAL_RECIPIENT_OVERRIDE[fname]
                 p = Person(crew_id=crew.id, site_id=site.id, role="worker", first_name=fname,
                            language=lang, consent=consent,
                            consent_at=now if consent != "pending" else None,
-                           phone=f"+97150000{n:04d}" if s["country"] == "AE" else f"+92300000{n:04d}")
+                           phone=phone)
                 db.add(p)
                 db.flush()
                 if consent == "pending":
