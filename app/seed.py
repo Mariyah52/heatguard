@@ -51,9 +51,16 @@ STAFF = [
 
 
 def seed_demo(db):
+    # Run drop/create as their own short-lived transactions, each committed
+    # immediately, so a slow/cold-starting DB compute never has to hold a
+    # single long-running transaction open across all of these DDL calls
+    # (that's what was tripping Neon's idle-in-transaction timeout).
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+
     db.add(Setting(key="clock_offset_min", value="0"))
+    db.commit()
+
     now = datetime.now(timezone.utc).replace(tzinfo=None).replace(microsecond=0)
     n = 0
     crew_i = 0
@@ -61,18 +68,19 @@ def seed_demo(db):
         site = Site(name=s["name"], city=s["city"], country=s["country"], lat=s["lat"],
                     lon=s["lon"], tz_offset_s=s["tz"])
         db.add(site)
-        db.flush()
+        db.commit()
         for name, role, lang in STAFF[si]:
             n += 1
             db.add(Person(site_id=site.id, role=role, first_name=name, language=lang,
                           phone=f"+97150000{n:04d}" if s["country"] == "AE" else f"+92300000{n:04d}",
                           consent="yes", consent_at=now))
+        db.commit()
         for c in s["crews"]:
             crew = Crew(site_id=site.id, name=c["name"], task=c["task"], workload=c["workload"],
                         clothing=c["clothing"], acclimatised_days=c["acclimatised_days"],
                         shaded=c.get("shaded", False))
             db.add(crew)
-            db.flush()
+            db.commit()
             for fname, lang, consent in WORKERS[crew_i]:
                 n += 1
                 phone = f"+97150000{n:04d}" if s["country"] == "AE" else f"+92300000{n:04d}"
@@ -83,9 +91,8 @@ def seed_demo(db):
                            consent_at=now if consent != "pending" else None,
                            phone=phone)
                 db.add(p)
-                db.flush()
+                db.commit()
                 if consent == "pending":
                     send(db, p, i18n.t("consent_request", lang, company="Demo Contracting LLC"),
                          "consent", now)
             crew_i += 1
-    db.commit()
