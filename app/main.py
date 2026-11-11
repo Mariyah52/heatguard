@@ -35,7 +35,14 @@ async def _loop():
 async def lifespan(app: FastAPI):
     init_db()
     with SessionLocal() as db:
-        if not db.scalars(select(Site)).first():
+        needs_seed = not db.scalars(select(Site)).first()
+        # Release this session's transaction now. seed_demo() runs slow DDL
+        # (drop_all/create_all) on a separate engine-level connection; if we
+        # leave the SELECT's transaction open on `db` while that DDL runs
+        # against a cold-starting Neon compute, Neon kills this session for
+        # sitting idle-in-transaction before seed_demo ever gets to use it.
+        db.commit()
+        if needs_seed:
             seed_demo(db)
     task = asyncio.create_task(_loop())
     yield
