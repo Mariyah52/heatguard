@@ -9,6 +9,7 @@ from app.risk import (CAUTION, EXTREME, HIGH, LOW, Conditions, CrewProfile, Hour
                       in_uae_midday_ban, outlook, sun_adjustment_f)
 
 FIX = json.loads((Path(__file__).parent / "fixtures/openmeteo_2026-11-06.json").read_text())
+HOT = json.loads((Path(__file__).parent / "fixtures/openmeteo_2026-07-20_hot.json").read_text())
 
 
 @pytest.mark.parametrize("temp_f,rh,expected_f", [
@@ -70,8 +71,8 @@ def test_fallback_is_never_low():
     assert fallback_level(datetime(2026, 11, 6, 13, 0)).degraded
 
 
-def _hours(site):
-    h = FIX[site]["hourly"]
+def _hours(site, fixture=FIX):
+    h = fixture[site]["hourly"]
     return [HourPoint(datetime.fromisoformat(t),
                       Conditions(h["temperature_2m"][i], h["relative_humidity_2m"][i],
                                  h["shortwave_radiation"][i], h["wind_speed_10m"][i]))
@@ -106,3 +107,66 @@ def test_cool_conditions_do_not_raise_false_alarms():
                                                    acclimatised_days=1))
     assert r.level == LOW
     assert any("still cool" in x for x in r.reasons)
+
+
+# --- Real hot-day data, pulled from Open-Meteo's historical archive for actual
+# summer heat (not a mild November day): Abu Dhabi peaked at 47.6°C on
+# 20 Jul 2026 (13% RH) and Karachi's hottest day in Jun-Jul 2026 was 11 Jun
+# (34.9°C at 93% RH — a dangerous humid heat day even though the raw
+# temperature is lower than Abu Dhabi's). These are the real recorded
+# conditions, not a synthetic or mild-season fixture.
+
+def test_real_abu_dhabi_july_heatwave_warns_well_before_the_peak():
+    """20 Jul 2026, Abu Dhabi: a real recorded 47.6 °C peak at 14:00 (vs ~30 °C overnight).
+    A moderate crew is only at Caution in the 07:00 morning reading, so the engine must
+    warn at least an hour ahead of the real High/Extreme hours that follow."""
+    hours = _hours("abudhabi", HOT)
+    now = datetime(2026, 7, 20, 7, 0)
+    cur = hours[7].cond
+    crew = CrewProfile()  # moderate workload, standard clothing, acclimatised
+    o = outlook(now, cur, hours, crew, "AE", horizon_h=8)
+    assert o.current.level < HIGH                 # 07:00 is still only Caution for this crew
+    assert o.peak_level == EXTREME                 # the real recorded peak is well past 115°F heat index
+    assert o.first_high_at is not None
+    assert o.warning_lead_minutes(now) >= 60        # warned at least an hour ahead of the real peak
+    # at the real 14:00 peak the UAE's mandated midday work ban is also in force
+    peak_assess = assess(hours[14].cond, crew, "AE", hours[14].local_dt)
+    assert peak_assess.legal_stop
+
+
+def test_real_abu_dhabi_july_distinguishes_cooler_hours_from_the_peak():
+    """Even on the hottest recorded day of the window, the engine should still read the
+    relatively cooler pre-dawn hours (30.6 °C, 03:00) as lower risk than the 47.6 °C peak —
+    i.e. it isn't just flagging the whole day as Extreme regardless of the data."""
+    hours = _hours("abudhabi", HOT)
+    crew = CrewProfile()
+    cooler = assess(hours[3].cond, crew, "AE", hours[3].local_dt)   # 03:00, 30.6°C
+    peak = assess(hours[14].cond, crew, "AE", hours[14].local_dt)   # 14:00, 47.6°C (real recorded peak)
+    assert cooler.level < peak.level
+    assert peak.level == EXTREME
+
+
+def test_real_karachi_june_humid_heat_hits_high_for_exposed_crew():
+    """11 Jun 2026, Karachi: only 34.9°C at the peak, but 93% RH makes it dangerous —
+    this is the real recorded hot day for the city in Jun-Jul 2026, replacing the
+    6 Nov off-season test date."""
+    hours = _hours("karachi", HOT)
+    now = datetime(2026, 6, 11, 8, 0)
+    exposed = CrewProfile(workload="heavy", clothing="non_breathable")
+    o = outlook(now, hours[8].cond, hours, exposed, "PK", horizon_h=8)
+    assert o.peak_level >= HIGH
+    assert o.warning_lead_minutes(now) is None or o.warning_lead_minutes(now) >= 60
+
+
+def test_real_karachi_june_shaded_light_crew_stays_lower_than_exposed():
+    """11 Jun 2026, Karachi: humid heat (93% RH) keeps risk elevated even at a modest
+    34.9°C peak. In the evening cool-down (20:00-23:00) a shaded, light-duty crew drops
+    to Caution while a heavy, non-breathable-PPE crew is still at High — the real data
+    shows job factors matter as much as the raw temperature here."""
+    hours = _hours("karachi", HOT)
+    now = datetime(2026, 6, 11, 19, 0)
+    shaded = CrewProfile(workload="light", shaded=True)
+    exposed = CrewProfile(workload="heavy", clothing="non_breathable")
+    o1 = outlook(now, hours[19].cond, hours, shaded, "PK", horizon_h=4)
+    o2 = outlook(now, hours[19].cond, hours, exposed, "PK", horizon_h=4)
+    assert o1.peak_level < o2.peak_level
