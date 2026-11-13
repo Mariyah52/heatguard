@@ -197,8 +197,12 @@ def assess(cond: Conditions, crew: CrewProfile, country: str = "",
     wbgt_limit = _wbgt.iso7243_limit_c(crew.workload, crew.acclimatised_days)
     wbgt_level = _wbgt.iso7243_band(wbgt_val, crew.workload, crew.acclimatised_days)
     if wbgt_level > level:
-        reasons.append(f"WBGT estimate {wbgt_val:.0f}°C exceeds the ISO 7243 reference "
-                        f"limit for {crew.workload} work ({wbgt_limit:.0f}°C)")
+        if wbgt_val >= wbgt_limit:
+            reasons.append(f"WBGT estimate {wbgt_val:.0f}°C exceeds the ISO 7243 reference "
+                            f"limit for {crew.workload} work ({wbgt_limit:.0f}°C)")
+        else:
+            reasons.append(f"WBGT estimate {wbgt_val:.0f}°C is approaching the ISO 7243 "
+                            f"reference limit for {crew.workload} work ({wbgt_limit:.0f}°C)")
         level = wbgt_level
 
     legal = bool(local_dt and in_uae_midday_ban(country, local_dt))
