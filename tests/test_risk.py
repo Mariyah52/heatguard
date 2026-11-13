@@ -103,7 +103,10 @@ def test_real_karachi_light_shaded_crew_stays_lower():
 
 
 def test_cool_conditions_do_not_raise_false_alarms():
-    r = assess(Conditions(23, 87, 35), CrewProfile(workload="heavy", clothing="non_breathable",
+    # Genuinely cool and dry, not just low air temperature with high humidity --
+    # see test_wbgt.py for the case where humidity alone makes a moderate
+    # temperature dangerous under ISO 7243 even though the heat index misses it.
+    r = assess(Conditions(20, 50, 0), CrewProfile(workload="heavy", clothing="non_breathable",
                                                    acclimatised_days=1))
     assert r.level == LOW
     assert any("still cool" in x for x in r.reasons)

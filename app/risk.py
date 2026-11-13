@@ -122,6 +122,9 @@ class Risk:
     reasons: list[str] = field(default_factory=list)
     legal_stop: bool = False
     degraded: bool = False
+    wbgt_c: float | None = None
+    wbgt_level: int | None = None
+    wbgt_limit_c: float | None = None
 
     @property
     def name(self) -> str:
@@ -142,12 +145,18 @@ class Risk:
             "reasons": self.reasons,
             "legal_stop": self.legal_stop,
             "degraded": self.degraded,
+            "wbgt_c": round(self.wbgt_c, 1) if self.wbgt_c is not None else None,
+            "wbgt_level": self.wbgt_level,
+            "wbgt_name": LEVELS[self.wbgt_level] if self.wbgt_level is not None else None,
+            "wbgt_limit_c": self.wbgt_limit_c,
         }
 
 
 def assess(cond: Conditions, crew: CrewProfile, country: str = "",
            local_dt: datetime | None = None) -> Risk:
     """Risk for one crew under one set of conditions, with reasons."""
+    from . import wbgt as _wbgt  # deferred: wbgt.py imports constants back from this module
+
     hi = heat_index_f(cond.temp_c, cond.rh)
     sun = sun_adjustment_f(cond.radiation_wm2, crew.shaded)
     adjusted = hi + sun
@@ -177,12 +186,28 @@ def assess(cond: Conditions, crew: CrewProfile, country: str = "",
     level = min(level, EXTREME)
     if level == base == LOW and len(reasons) == 1:
         reasons.append("no added job factors")
+
+    # ISO 7243 cross-check: estimate WBGT from the same weather fields and compare
+    # against the standard's reference limit for this crew's workload class. HeatGuard
+    # takes the worse of the two verdicts -- this can only raise the final level, never
+    # lower it, so it never masks a heat-index-driven warning.
+    wbgt_radiation = 0.0 if crew.shaded else cond.radiation_wm2
+    wbgt_val = _wbgt.wbgt_estimate_c(cond.temp_c, cond.rh, wbgt_radiation,
+                                      cond.wind_kmh and cond.wind_kmh / 3.6)
+    wbgt_limit = _wbgt.iso7243_limit_c(crew.workload, crew.acclimatised_days)
+    wbgt_level = _wbgt.iso7243_band(wbgt_val, crew.workload, crew.acclimatised_days)
+    if wbgt_level > level:
+        reasons.append(f"WBGT estimate {wbgt_val:.0f}°C exceeds the ISO 7243 reference "
+                        f"limit for {crew.workload} work ({wbgt_limit:.0f}°C)")
+        level = wbgt_level
+
     legal = bool(local_dt and in_uae_midday_ban(country, local_dt))
     if legal:
         level = EXTREME
         reasons.append("UAE midday break in force: no outdoor work 12:30–15:00")
     return Risk(level=level, heat_index_f=hi, adjusted_f=adjusted,
-                reasons=reasons, legal_stop=legal)
+                reasons=reasons, legal_stop=legal,
+                wbgt_c=wbgt_val, wbgt_level=wbgt_level, wbgt_limit_c=wbgt_limit)
 
 
 def fallback_level(local_dt: datetime) -> Risk:
