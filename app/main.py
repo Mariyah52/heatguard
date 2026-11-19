@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -64,16 +66,26 @@ def health():
     return {"ok": True}
 
 
+def _json_etag(request: Request, data: dict) -> Response:
+    """JSON with an ETag, so the dashboard can poll every few seconds almost for free."""
+    body = json.dumps(data, sort_keys=True, default=str)
+    etag = '"' + hashlib.md5(body.encode()).hexdigest()[:16] + '"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/json", headers=headers)
+
+
 @app.get("/api/state")
-def get_state():
+def get_state(request: Request):
     with SessionLocal() as db:
-        return service.state(db)
+        return _json_etag(request, service.state(db))
 
 
 @app.get("/api/phones")
-def get_phones():
+def get_phones(request: Request):
     with SessionLocal() as db:
-        return service.phone_view(db)
+        return _json_etag(request, service.phone_view(db))
 
 
 @app.get("/api/metrics")
@@ -183,6 +195,10 @@ def sim_feed(body: Feed):
             for s in db.scalars(select(Site)).all():
                 s.weather_fetched_at = None if s.weather is None else s.weather_fetched_at
                 s.weather_status = "cache" if s.weather else "fallback"
+        else:
+            # feed restored: refetch right away instead of waiting out the 15-minute refresh
+            for s in db.scalars(select(Site)).all():
+                s.weather_fetched_at = None
         db.commit()
         return service.run_cycle(db)
 
@@ -199,6 +215,16 @@ def sim_reply(body: SimReply):
         if not p:
             raise HTTPException(404, "person not found")
         return service.handle_inbound(db, p.phone, body.text)
+
+
+@app.post("/api/people/{person_id}/purge")
+def purge(person_id: int):
+    """Data-purge control: delete a person's replies and stop all alerts to them."""
+    with SessionLocal() as db:
+        r = service.purge_and_opt_out(db, person_id)
+        if r is None:
+            raise HTTPException(404, "person not found")
+        return r
 
 
 @app.post("/api/demo/reset")

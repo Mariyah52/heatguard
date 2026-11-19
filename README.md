@@ -73,12 +73,20 @@ pytest
 
 `tests/fixtures/openmeteo_2026-11-06.json` is real Open-Meteo data for Mussafah (Abu Dhabi) and Port Qasim (Karachi) on 6 November 2026, used for tests and offline runs. `backtest_data/*_2025_summer.json` is real Open-Meteo **archive** data for both sites, 1 Jun – 15 Sep 2025, used for the back-test above.
 
+## Live dashboard and shift planner (v2)
+
+- The screen refreshes every 5 seconds (ETag-cached, so it is cheap) with a Live / Reconnecting indicator. Every button shows progress, disables while it works, and the screen is redrawn from the server's state afterwards. An open menu, expanded plan or half-typed reply is never wiped by a refresh.
+- A summary strip shows crews at High/Extreme, open escalations, sign-ups and weather source.
+- Forecast-based planner (`app/planner.py`, rules-based, no model to train): scores every forecast hour for the next four days with the live risk engine, lists the safer hours inside each crew's shift, sets water and shade-rest guidance from the worst hour (heavy work adds rest), caps new workers at 20% of normal workload on day one (+20% a day, NIOSH), and reports whether the coming days are hotter or easing.
+- Alerts are labelled as automated guidance, not a medical diagnosis, on the dashboard, in the planner output and in the worker-protection page.
+- `python3 tests/browser_test.py` clicks through the real dashboard (18 checks).
+
 ## Worker protection
 
 - Workers join only by replying YES; STOP removes them.
 - Stored: phone number, crew, language and replies. No location tracking, no health history.
 - Supervisors see crew-level status; a first name appears only while an escalation is open.
-- Replies are deleted after 30 days.
+- Replies are deleted after 30 days, or immediately on request: STOP, or the "Delete my replies and opt out" control (`POST /api/people/{id}/purge`), removes every reply a person sent and stops all alerts.
 - HeatGuard is not a medical device and doesn't diagnose; anyone unwell is routed to a person.
 
 ## Limitations

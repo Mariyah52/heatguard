@@ -79,6 +79,22 @@ details.why{grid-column:1/-1;font-size:13px;color:var(--ink-2);margin-top:-6px}
 details.why summary{cursor:pointer;width:max-content}
 details.why ul{margin:6px 0 0;padding-left:18px}
 
+/* live strip, disclaimer, plan */
+.disclaimer{margin:0 0 16px;padding:8px 12px;border-left:4px solid var(--l1);background:#FFF8E6;font-size:13px;color:var(--ink-2)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.kpi .n{font-size:26px;font-weight:800;font-stretch:110%;line-height:1.1}
+.kpi .d{font-size:13px;color:var(--ink-2)}
+.kpi.hot{border-color:var(--l3)}.kpi.hot .n{color:var(--l3)}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#6FCF8E;margin-right:6px}
+.live-dot.off{background:#E5A23C}
+details.plan{grid-column:1/-1;font-size:13px;color:var(--ink-2);margin-top:-6px}
+details.plan summary{cursor:pointer;width:max-content;font-weight:600;color:var(--ink)}
+details.plan ul{margin:6px 0;padding-left:18px}
+table.mini{font-size:13px;margin:6px 0;max-width:560px}
+table.mini th,table.mini td{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:progress}
+.phone-tools{display:flex;gap:8px;align-items:center;padding:6px 16px;background:#E7F0EC;font-size:12px}
 /* side column */
 aside{position:sticky;top:110px;display:flex;flex-direction:column;gap:20px}
 .panel{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
@@ -165,10 +181,13 @@ th{background:var(--shade);font-weight:650}
     </nav>
   </div>
   <div class="status-line" id="status"></div>
+  <div class="status-line" id="livebar"></div>
 </header>
 
 <main>
   <section class="view on" id="live">
+    <p class="disclaimer">HeatGuard sends automated heat-stress alerts. It is guidance, not a medical diagnosis and not emergency care. Anyone who feels unwell is routed to a person: the supervisor, the first-aider or emergency services.</p>
+    <div class="kpis" id="kpis" aria-live="polite"></div>
     <div class="grid">
       <div id="sites"></div>
       <aside>
@@ -189,7 +208,7 @@ th{background:var(--shade);font-weight:650}
           <label>Time and failures</label>
           <div class="row">
             <button class="btn ghost" id="advance">Skip ahead 20 minutes</button>
-            <button class="btn ghost" id="feed">Cut the weather feed</button>
+            <button class="btn ghost" id="feed" data-dyn="1">Cut the weather feed</button>
           </div>
           <div class="row">
             <button class="btn ghost" id="run">Check all sites now</button>
@@ -223,7 +242,8 @@ th{background:var(--shade);font-weight:650}
         <li><b>Only what's needed.</b> Phone number, crew, language and replies. No location tracking and no health history.</li>
         <li><b>Supervisors see crews, not medical detail.</b> A worker's first name appears only while a live escalation is open, so someone can reach them. After it's handled, the record shows "worker".</li>
         <li><b>Never used against workers.</b> HeatGuard data can't be used for discipline, pay, hiring, insurance or performance reviews.</li>
-        <li><b>Replies are deleted after 30 days.</b> Only counts remain for results reporting.</li>
+        <li><b>Replies are deleted after 30 days, or at once on request.</b> Replying STOP, or using "Delete my replies and opt out" on a worker's phone, deletes every reply that person sent and stops all alerts. Only counts remain for results reporting.</li>
+        <li><b>Alerts are not diagnoses.</b> HeatGuard compares weather and job conditions with published heat-stress guidance. It never says a person has heat illness, and it does not replace first aid or emergency care.</li>
         <li><b>Not a medical device.</b> HeatGuard warns and guides. Anyone who feels unwell is routed to a person: the supervisor, the first-aider, or emergency services.</li>
         <li><b>When unsure, it raises the alarm.</b> Missing weather data or no reply makes HeatGuard more cautious, never less.</li>
       </ul>
@@ -235,6 +255,8 @@ th{background:var(--shade);font-weight:650}
         <li>One level higher for heavy work or non-breathable clothing, and one more for workers with under 7 days in the heat. Only applied once it's warm, so cool mornings don't raise false alarms.</li>
         <li>In the UAE, outdoor work is stopped 12:30–15:00 from 15 June to 15 September, as the law requires.</li>
       </ol>
+      <h2>How the shift plan works</h2>
+      <p>HeatGuard scores every forecast hour for the next four days with the same rules, then finds the hours inside each crew's shift that reach High or worse and lists the safer hours. It sets water and shade-rest guidance from the worst hour of the day (heavy work adds rest), caps new workers at 20% of normal workload on day one and adds 20% a day (NIOSH), and says whether the coming days are hotter or easing. It is a rules-based planner on live forecast data, so every number can be explained.</p>
       <h2>Message workers receive to join</h2>
       <p id="consent-text"></p>
     </div>
@@ -247,6 +269,7 @@ th{background:var(--shade);font-weight:650}
 const LV=["Low","Caution","High","Extreme"];
 const $=s=>document.querySelector(s);
 let S=null, P=null, currentPerson=null;
+let seq=0, lastKey="", pendingRender=false, lastOk=null, draft="";
 
 function flagSvg(l,size=22,pole="var(--ink)"){
   const c=["var(--l0)","var(--l1)","var(--l2)","var(--l3)"][l] || "var(--line)";
@@ -256,9 +279,25 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const hhmm=iso=>iso?iso.slice(11,16):"";
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2600)}
 async function api(path,opts={}){
-  const r=await fetch(path,{headers:{"Content-Type":"application/json"},...opts,body:opts.body?JSON.stringify(opts.body):undefined});
-  if(!r.ok){const t=await r.text();toast("Couldn't do that: "+t.slice(0,80));throw new Error(t)}
+  const {quiet,...o}=opts;
+  let r;
+  try{r=await fetch(path,{headers:{"Content-Type":"application/json"},...o,body:o.body?JSON.stringify(o.body):undefined})}
+  catch(e){if(!quiet)toast("No connection to the server. Try again.");throw e}
+  if(!r.ok){const t=await r.text();if(!quiet)toast("Couldn't do that: "+t.slice(0,80));throw new Error(t)}
   return r.json();
+}
+/* run one button action: disable it, show progress, then refresh the screen from the server */
+async function act(btn,label,fn,okMsg){
+  if(btn.disabled)return;
+  const old=btn.textContent;btn.disabled=true;if(label)btn.textContent=label;
+  try{await fn();if(okMsg)toast(okMsg);await load(true)}catch(e){}
+  finally{btn.disabled=false;if(btn.dataset.dyn!=="1")btn.textContent=old}
+}
+const userIsEditing=()=>{const a=document.activeElement;return !!a&&(a.tagName==="SELECT"||a.tagName==="INPUT")&&!a.closest("#gate")};
+function setLive(ok){
+  const t=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  if(ok)lastOk=t;
+  $("#livebar").innerHTML=`<span><span class="live-dot ${ok?"":"off"}"></span>${ok?`<b>Live</b>, updated ${t}`:`<b>Reconnecting…</b> last update ${lastOk||"never"}`}</span>`;
 }
 
 /* ---------- Sites ---------- */
@@ -266,7 +305,7 @@ const SRC={live:"Live weather",cache:"Weather feed down: using last forecast",fa
 function renderSites(){
   $("#company").textContent=S.company;
   const offs=S.clock_offset_min?` (demo clock +${S.clock_offset_min} min)`:"";
-  $("#status").innerHTML=`<span>Checked every 15 minutes${offs}</span>`+(S.feed_down?`<span><b>Weather feed cut in demo</b></span>`:"");
+  $("#status").innerHTML=`<span>Weather checked every 15 minutes, screen refreshes every 5 seconds${offs}</span>`+(S.feed_down?`<span><b>Weather feed cut in demo</b></span>`:"");
   $("#sites").innerHTML=S.sites.map(s=>{
     const warn=s.weather_status!=="live"&&s.weather_status!=="sim";
     const src=SRC[s.weather_status]||s.weather_status;
@@ -278,7 +317,9 @@ function renderSites(){
     </article>`}).join("");
   document.querySelectorAll(".factors select").forEach(sel=>sel.onchange=async()=>{
     const body={};body[sel.dataset.k]=sel.dataset.k==="acclimatised_days"?Number(sel.value):sel.dataset.k==="shaded"?sel.value==="1":sel.value;
-    await api(`/api/crews/${sel.dataset.id}`,{method:"PATCH",body});toast("Crew updated and rechecked");load();
+    sel.disabled=true;
+    try{await api(`/api/crews/${sel.dataset.id}`,{method:"PATCH",body});toast("Crew updated and rechecked")}catch(e){}
+    sel.disabled=false;sel.blur();await load(true);
   });
   const opts=S.sites.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");
   const sel=$("#sim-site"),v=sel.value;sel.innerHTML=opts;if(v)sel.value=v;
@@ -315,8 +356,27 @@ function crewRow(c){
     <div class="flag">${flagSvg(l)}<div><div class="lv lv${l}">${LV[l]}</div><div class="fl">${fl}</div></div></div>
     <div class="strip-wrap"><div class="strip" aria-label="Heat risk for the next 6 hours">${cells}</div><div class="strip-note" style="margin-top:18px">${note}</div></div>
     <div class="checks">${checks}</div>
-    <details class="why"><summary>Why ${LV[l]}?</summary><ul>${cur.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></details>
+    ${planHtml(c)}
+    <details class="why" data-key="why-${c.id}"><summary>Why ${LV[l]}?</summary><ul>${cur.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></details>
   </div>`;
+}
+function planHtml(c){
+  const p=c.outlook&&c.outlook.plan; if(!p) return "";
+  const days=p.days.map(d=>`<tr><td>${esc(d.date.slice(5))}</td><td>${LV[d.peak_level]}</td><td>${esc(d.peak_at)}</td><td>${Math.round(d.peak_feels_c)}°C</td><td>${d.risky_shift_hours}</td></tr>`).join("");
+  return `<details class="plan" data-key="plan-${c.id}"><summary>Plan: shifts, water and rest</summary>
+    <ul>${p.advice.map(a=>`<li>${esc(a)}</li>`).join("")}</ul>
+    <table class="mini"><thead><tr><th>Day</th><th>Peak</th><th>At</th><th>Feels like</th><th>High hours in shift</th></tr></thead><tbody>${days}</tbody></table>
+    <p class="hint">${esc(p.disclaimer)}</p></details>`;
+}
+function renderKpis(){
+  const crews=S.sites.flatMap(s=>s.crews);
+  const hi=crews.filter(c=>c.outlook&&c.outlook.current.level>=2).length;
+  const signed=crews.reduce((a,c)=>a+c.consented,0), tot=crews.reduce((a,c)=>a+c.workers,0);
+  const open=S.escalations.filter(e=>!e.acknowledged).length;
+  const live=S.sites.filter(s=>s.weather_status==="live"||s.weather_status==="sim").length;
+  $("#kpis").innerHTML=[[hi,`crew${hi===1?"":"s"} at High or Extreme now`,hi?"hot":""],[open,"open escalations",open?"hot":""],
+    [`${signed}/${tot}`,"workers signed up",""],[`${live}/${S.sites.length}`,"sites on live or simulated weather",""]]
+    .map(([n,d,c])=>`<div class="kpi ${c}"><div class="n">${n}</div><div class="d">${d}</div></div>`).join("");
 }
 function renderEscs(){
   const open=S.escalations.filter(e=>!e.acknowledged), done=S.escalations.filter(e=>e.acknowledged).slice(0,4);
@@ -325,7 +385,7 @@ function renderEscs(){
       ${e.acknowledged?`<small>Handled by ${esc(e.acknowledged_by)} after ${e.ack_minutes} min</small>`:`<button class="btn small" data-ack="${e.id}">Mark as handled</button>`}
     </div>`;
   $("#escs").innerHTML=(open.length?open.map(item).join(""):`<p class="empty">Nobody needs help right now.</p>`)+(done.length?`<p class="hint">Recently handled</p>`+done.map(item).join(""):"");
-  document.querySelectorAll("[data-ack]").forEach(b=>b.onclick=async()=>{await api(`/api/escalations/${b.dataset.ack}/ack`,{method:"POST"});toast("Marked as handled");load()});
+  document.querySelectorAll("[data-ack]").forEach(b=>b.onclick=()=>act(b,"Saving…",()=>api(`/api/escalations/${b.dataset.ack}/ack`,{method:"POST"}),"Marked as handled"));
 }
 
 /* ---------- Phones ---------- */
@@ -336,7 +396,7 @@ function renderPeople(){
   $("#people").innerHTML=P.people.map(p=>`<button role="listitem" data-p="${p.id}" aria-current="${p.id===currentPerson}">
     ${esc(p.name)}${p.open_checkin?'<span class="dot" title="Waiting for reply"></span>':""}
     <small>${ROLE[p.role]}, ${LANG[p.language]}${p.crew?`, ${esc(p.crew)}`:`, ${esc(p.site)}`}${p.consent!=="yes"?` (${p.consent==="pending"?"not signed up yet":"opted out"})`:""}</small></button>`).join("");
-  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{currentPerson=Number(b.dataset.p);renderPeople();renderPhone()});
+  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{currentPerson=Number(b.dataset.p);draft="";renderPeople();renderPhone()});
 }
 function renderPhone(){
   const p=P.people.find(x=>x.id===currentPerson); if(!p) return;
@@ -346,15 +406,18 @@ function renderPhone(){
     ||`<p class="empty" style="text-align:center;margin-top:30%">No messages yet. Start a heatwave on the Sites view.</p>`;
   $("#phone").innerHTML=`<div class="phone-head"><b>${esc(p.name)}</b><small>${ROLE[p.role]}, ${LANG[p.language]}, ${esc(p.phone)} (fictional), times are local</small></div>
     <div class="thread" id="thread">${thread}</div>
-    <form class="composer" id="composer"><input id="reply" aria-label="Reply as ${esc(p.name)}" placeholder="Reply as ${esc(p.name)}: try YES, STOP${p.role!=="worker"?", ACK":", OK"}"><button class="btn small">Send</button></form>`;
+    ${p.role==="worker"?`<div class="phone-tools"><span>Privacy:</span><button class="btn ghost small" id="purge">Delete my replies and opt out</button></div>`:""}
+    <form class="composer" id="composer"><input id="reply" value="${esc(draft)}" aria-label="Reply as ${esc(p.name)}" placeholder="Reply as ${esc(p.name)}: try YES, STOP${p.role!=="worker"?", ACK":", OK"}"><button class="btn small">Send</button></form>`;
   const t=$("#thread");t.scrollTop=t.scrollHeight;
   document.querySelectorAll("[data-reply]").forEach(b=>b.onclick=()=>reply(p.id,b.dataset.reply));
-  $("#composer").onsubmit=e=>{e.preventDefault();const v=$("#reply").value.trim();if(v)reply(p.id,v)};
+  $("#reply").oninput=e=>{draft=e.target.value};
+  $("#composer").onsubmit=e=>{e.preventDefault();const v=$("#reply").value.trim();if(v){draft="";reply(p.id,v)}};
+  const pg=$("#purge");if(pg)pg.onclick=()=>act(pg,"Deleting…",()=>api(`/api/people/${p.id}/purge`,{method:"POST"}),"Replies deleted and alerts stopped");
 }
 async function reply(pid,text){
   const r=await api("/api/sim/reply",{method:"POST",body:{person_id:pid,text}});
   const map={escalated:"Supervisor and first-aider alerted",ok:"Reply recorded",consented:"Signed up",opted_out:"Opted out",acknowledged:"Escalation handled",noted:"Message received"};
-  toast(map[r.action]||"Sent");await load();
+  toast(map[r.action]||"Sent");await load(true);
 }
 
 /* ---------- Results ---------- */
@@ -379,30 +442,45 @@ async function renderMetrics(){
 }
 
 /* ---------- wiring ---------- */
-async function load(){
-  [S,P]=await Promise.all([api("/api/state"),api("/api/phones")]);
-  renderSites();renderEscs();renderPeople();renderPhone();
+function render(){
+  const open=new Set([...document.querySelectorAll("details[data-key][open]")].map(d=>d.dataset.key));
+  renderSites();renderKpis();renderEscs();renderPeople();renderPhone();
+  document.querySelectorAll("details[data-key]").forEach(d=>{if(open.has(d.dataset.key))d.open=true});
+  $("#feed").textContent=S.feed_down?"Restore the weather feed":"Cut the weather feed";
   if($("#metrics").classList.contains("on")) renderMetrics();
 }
+/* latest request wins; unchanged data is not redrawn; a menu or text box in use is never wiped */
+async function load(force=false){
+  const my=++seq;let st,ph;
+  try{[st,ph]=await Promise.all([api("/api/state",{quiet:true}),api("/api/phones",{quiet:true})])}
+  catch(e){if(my===seq)setLive(false);return}
+  if(my!==seq)return;
+  setLive(true);
+  const key=JSON.stringify([st,ph]);
+  if(!force&&key===lastKey)return;
+  if(!force&&userIsEditing()){pendingRender=true;return}
+  S=st;P=ph;lastKey=key;pendingRender=false;render();
+}
+document.addEventListener("focusout",()=>setTimeout(()=>{if(pendingRender&&!userIsEditing())load(true)},250));
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("nav button").forEach(x=>x.removeAttribute("aria-current"));
   b.setAttribute("aria-current","page");
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id===b.dataset.view));
   if(b.dataset.view==="metrics") renderMetrics();
 });
-document.querySelectorAll("[data-preset]").forEach(b=>b.onclick=async()=>{
-  await api("/api/sim/heat",{method:"POST",body:{site_id:Number($("#sim-site").value),preset:b.dataset.preset}});toast("Conditions set; alerts sent where needed");load()});
-$("#sim-clear").onclick=async()=>{await api(`/api/sim/heat/${$("#sim-site").value}`,{method:"DELETE"});toast("Back to live weather");load()};
-$("#advance").onclick=async()=>{await api("/api/sim/advance",{method:"POST",body:{minutes:20}});toast("20 minutes later");load()};
-$("#feed").onclick=async()=>{const down=!S.feed_down;await api("/api/sim/feed",{method:"POST",body:{down}});$("#feed").textContent=down?"Restore the weather feed":"Cut the weather feed";toast(down?"Weather feed cut":"Weather feed restored");load()};
-$("#run").onclick=async()=>{await api("/api/cycle",{method:"POST"});toast("All sites checked");load()};
-$("#reset").onclick=async()=>{if(!confirm("Reset the demo to its starting state?"))return;await api("/api/demo/reset",{method:"POST"});currentPerson=null;toast("Demo reset");load()};
+document.querySelectorAll("[data-preset]").forEach(b=>b.onclick=()=>act(b,"Applying…",()=>api("/api/sim/heat",{method:"POST",body:{site_id:Number($("#sim-site").value),preset:b.dataset.preset}}),"Conditions set; alerts sent where needed"));
+$("#sim-clear").onclick=e=>act(e.currentTarget,"Restoring…",()=>api(`/api/sim/heat/${$("#sim-site").value}`,{method:"DELETE"}),"Back to live weather");
+$("#advance").onclick=e=>act(e.currentTarget,"Skipping…",()=>api("/api/sim/advance",{method:"POST",body:{minutes:20}}),"20 minutes later");
+$("#feed").onclick=e=>{const down=!S.feed_down;return act(e.currentTarget,"Working…",()=>api("/api/sim/feed",{method:"POST",body:{down}}),down?"Weather feed cut":"Weather feed restored")};
+$("#run").onclick=e=>act(e.currentTarget,"Checking…",()=>api("/api/cycle",{method:"POST"}),"All sites checked");
+$("#reset").onclick=e=>{if(!confirm("Reset the demo to its starting state?"))return;currentPerson=null;draft="";return act(e.currentTarget,"Resetting…",()=>api("/api/demo/reset",{method:"POST"}),"Demo reset")};
 $("#enter").onclick=()=>{try{sessionStorage.setItem("hg-guest","1")}catch(e){};$("#gate").remove();load()};
 $("#gate .flags").innerHTML=[0,1,2,3].map(l=>flagSvg(l,26,"#fff")).join("");
 $("#consent-text").textContent="HeatGuard heat-safety alerts for Demo Contracting LLC. We send heat warnings and ask if you're OK during hot hours. We keep only your phone number, crew and replies, and delete replies after 30 days. Your replies are never used for discipline, pay or hiring. Reply YES to join, or STOP to leave at any time.";
 let guest=false;try{guest=sessionStorage.getItem("hg-guest")==="1"}catch(e){}
 if(guest){$("#gate").remove();load()}
-setInterval(()=>{if(!document.getElementById("gate")) load()},15000);
+setInterval(()=>{if(!document.getElementById("gate")&&!document.hidden) load()},5000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!document.getElementById("gate")) load()});
 </script>
 </body>
 </html>

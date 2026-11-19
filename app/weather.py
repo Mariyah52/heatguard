@@ -33,7 +33,7 @@ def fetch(lat: float, lon: float, retries: int = 2) -> dict:
     if FIXTURE:
         return _fixture_for(lat)
     params = {"latitude": lat, "longitude": lon, "current": FIELDS, "hourly": FIELDS,
-              "forecast_days": 2, "timezone": "auto"}
+              "forecast_days": 4, "timezone": "auto"}
     last = None
     for attempt in range(retries + 1):
         try:

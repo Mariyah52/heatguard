@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
-from . import i18n, weather
+from . import i18n, planner, weather
 from .messaging import send
 from .models import (Assessment, CheckIn, Crew, Escalation, Message, Person, Setting, Site,
                      Warning)
@@ -115,6 +115,9 @@ def run_cycle(db) -> dict:
                 first_high = o.first_high_at
             out["source"] = source
             out["at_local"] = now_local.isoformat()
+            out["plan"] = (planner.plan(now_local, hours, _profile(crew), site.country,
+                                        crew.shift_start, crew.shift_end)
+                           if source != "fallback" and hours else None)
             crew.current = out
             db.add(Assessment(crew_id=crew.id, at=now, level=out["current"]["level"],
                               source=source))
@@ -269,6 +272,7 @@ def handle_inbound(db, phone: str, text: str) -> dict:
         result["action"] = "consented"
     elif word in ("STOP", "UNSUBSCRIBE"):
         person.consent, person.consent_at = "no", now
+        purge_person(db, person)
         send(db, person, i18n.t("consent_stop", person.language), "consent", now)
         result["action"] = "opted_out"
     elif word == "ACK" and person.role in ("supervisor", "first_aider"):
@@ -300,6 +304,27 @@ def handle_inbound(db, phone: str, text: str) -> dict:
             result["action"] = "ok"
     db.commit()
     return result
+
+
+def purge_person(db, person: Person) -> int:
+    """Delete everything this person ever replied (the data-purge control). Counts stay for
+    results reporting; check-in answers are kept only as ok/unwell tallies with no text."""
+    rows = db.scalars(select(Message).where(Message.person_id == person.id,
+                                            Message.direction == "in")).all()
+    for m in rows:
+        db.delete(m)
+    db.flush()
+    return len(rows)
+
+
+def purge_and_opt_out(db, person_id: int) -> dict | None:
+    person = db.get(Person, person_id)
+    if not person:
+        return None
+    n = purge_person(db, person)
+    person.consent, person.consent_at = "no", now_utc(db)
+    db.commit()
+    return {"ok": True, "deleted_messages": n, "consent": "no"}
 
 
 def _ack(db, esc: Escalation, by: str, now):
