@@ -79,7 +79,7 @@ pytest
 - A summary strip shows crews at High/Extreme, open escalations, sign-ups and weather source.
 - Forecast-based planner (`app/planner.py`, rules-based, no model to train): scores every forecast hour for the next four days with the live risk engine, lists the safer hours inside each crew's shift, sets water and shade-rest guidance from the worst hour (heavy work adds rest), caps new workers at 20% of normal workload on day one (+20% a day, NIOSH), and reports whether the coming days are hotter or easing.
 - Alerts are labelled as automated guidance, not a medical diagnosis, on the dashboard, in the planner output and in the worker-protection page.
-- `python3 tests/browser_test.py` clicks through the real dashboard (18 checks).
+- `python3 scripts/e2e_dashboard.py` clicks through the real dashboard (18 checks).
 
 ## Worker protection
 

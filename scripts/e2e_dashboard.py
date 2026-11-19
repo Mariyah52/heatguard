@@ -1,5 +1,5 @@
 """End-to-end: run the real app and click through the dashboard like a judge would.
-python3 tests/browser_test.py"""
+python3 scripts/e2e_dashboard.py"""
 import os, subprocess, sys, time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
