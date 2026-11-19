@@ -473,5 +473,6 @@ def phone_view(db) -> dict:
                     "open_checkin": has_open,
                     "messages": [{"id": m.id, "dir": m.direction, "kind": m.kind, "body": m.body,
                                   "buttons": m.buttons, "delivery": m.delivery,
+                                  "error": (m.delivery_error or "")[:160],
                                   "at": (local(site, m.created_at) if site else m.created_at).isoformat()} for m in msgs]})
     return {"people": out}
